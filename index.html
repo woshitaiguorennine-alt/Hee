@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Recognition Attendance System</title>
+    <script async src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.0.0"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-api@1.0.0"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --dark: #1f2937;
+            --light: #f3f4f6;
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Navigation */
+        nav {
+            background: white;
+            padding: 15px 30px;
+            border-radius: var(--border-radius);
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        nav h1 {
+            color: var(--primary-color);
+            font-size: 24px;
+        }
+
+        nav .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Main Layout */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel h2 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 20px;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+
+        /* Video Container */
+        .video-container {
+            position: relative;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        video {
+            width: 100%;
+            border-radius: var(--border-radius);
+            background: #000;
+            max-height: 400px;
+            object-fit: cover;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            border-radius: var(--border-radius);
+        }
+
+        .video-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Buttons */
+        button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: var(--transition);
+            margin: 5px;
+        }
+
+        button:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+
+        button.danger {
+            background: var(--danger-color);
+        }
+
+        button.danger:hover {
+            background: #dc2626;
+        }
+
+        button.success {
+            background: var(--success-color);
+        }
+
+        button.success:hover {
+            background: #059669;
+        }
+
+        button.warning {
+            background: var(--warning-color);
+        }
+
+        button.warning:hover {
+            background: #d97706;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        label {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 14px;
+        }
+
+        input, select {
+            padding: 10px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Alert Messages */
+        .alert {
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 15px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert.success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid var(--success-color);
+        }
+
+        .alert.error {
+            background: #fee2e2;
+            color: #7f1d1d;
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .alert.info {
+            background: #dbeafe;
+            color: #0c2d6b;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        /* Recognition Result */
+        .recognition-result {
+            background: var(--light);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-top: 15px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .result-value {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        thead {
+            background: var(--light);
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        tr:hover {
+            background: #fafafa;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.present {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.absent {
+            background: #fee2e2;
+            color: #7f1d1d;
+        }
+
+        .status-badge.late {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* Stats Section */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: var(--dark);
+        }
+
+        .modal-close {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: var(--dark);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 20px;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            color: #999;
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            margin: 0;
+            transition: var(--transition);
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid var(--light);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            nav {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+
+        /* Loading State */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .timestamp {
+            color: #999;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .face-detection-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--light);
+            border-radius: var(--border-radius);
+            font-size: 13px;
+        }
+
+        .detection-accuracy {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .accuracy-bar {
+            width: 100%;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .accuracy-fill {
+            height: 100%;
+            background: var(--success-color);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav>
+            <h1>📸 Facial Recognition Attendance System</h1>
+            <div class="nav-buttons">
+                <button id="adminBtn">Admin Dashboard</button>
+                <button class="danger" id="logoutBtn" style="display:none;">Logout</button>
+                <button id="loginBtn">Login</button>
+            </div>
+        </nav>
+
+        <!-- Alerts -->
+        <div id="successAlert" class="alert success"></div>
+        <div id="errorAlert" class="alert error"></div>
+        <div id="infoAlert" class="alert info"></div>
+
+        <!-- Main Content -->
+        <div id="mainView" class="main-content">
+            <!-- Camera & Recognition Panel -->
+            <div class="panel">
+                <h2>📷 Face Recognition</h2>
+                
+                <div class="video-container">
+                    <video id="video" autoplay playsinline></video>
+                    <canvas id="canvas" style="display:none;"></canvas>
+                    <div class="video-status">
+                        <span class="status-indicator"></span>
+                        <span id="statusText">Ready</span>
+                    </div>
+                </div>
+
+                <div class="face-detection-info">
+                    <div class="detection-accuracy">
+                        <span>Confidence:</span>
+                        <span id="confidenceValue">0%</span>
+                    </div>
+                    <div class="accuracy-bar">
+                        <div class="accuracy-fill" id="accuracyFill" style="width: 0%;"></div>
+                    </div>
+                    <div id="faceInfo" style="margin-top: 10px; color: #666;"></div>
+                </div>
+
+                <div class="control-panel">
+                    <div class="control-group">
+                        <button class="success" id="startBtn" onclick="startCamera()">Start Camera</button>
+                        <button class="danger" id="stopBtn" onclick="stopCamera()" disabled>Stop Camera</button>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="attendeeSelect">Select Person:</label>
+                        <select id="attendeeSelect">
+                            <option value="">-- Choose a person --</option>
+                        </select>
+                    </div>
+
+                    <button class="success" id="markAttendanceBtn" onclick="markAttendance()" disabled>
+                        ✓ Mark Attendance
+                    </button>
+
+                    <div class="recognition-result" id="recognitionResult" style="display:none;">
+                        <div class="result-item">
+                            <span class="result-label">Detected Face:</span>
+                            <span class="result-value" id="detectedName">-</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Confidence:</span>
+                            <span class="result-value" id="detectedConfidence">-</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Time:</span>
+                            <span class="result-value" id="detectedTime">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Panel -->
+            <div class="panel">
+                <h2>📊 Today's Attendance</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalCount">0</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="presentCount">0</div>
+                        <div class="stat-label">Present</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="absentCount">0</div>
+                        <div class="stat-label">Absent</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="lateCount">0</div>
+                        <div class="stat-label">Late</div>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-button active" onclick="switchTab('today')">Today</button>
+                    <button class="tab-button" onclick="switchTab('history')">History</button>
+                    <button class="tab-button" onclick="switchTab('people')">People</button>
+                </div>
+
+                <div id="today" class="tab-content active">
+                    <div id="spinner" class="spinner" style="display:none;"></div>
+                    <table id="attendanceTable">
+                        <thead>
+                            <tr>
+                                <th>Person</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #999;">No records yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="history" class="tab-content">
+                    <table id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Person</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #999;">No history available</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="people" class="tab-content">
+                    <button class="success" onclick="openAddPersonModal()" style="margin-bottom: 15px;">
+                        + Add Person
+                    </button>
+                    <table id="peopleTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>ID</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="peopleBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #999;">No people registered</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard (hidden by default) -->
+        <div id="adminView" style="display:none;">
+            <div class="panel">
+                <h2>🔧 Admin Dashboard</h2>
+                
+                <div class="tabs">
+                    <button class="tab-button active" onclick="switchAdminTab('reports')">Reports</button>
+                    <button class="tab-button" onclick="switchAdminTab('settings')">Settings</button>
+                    <button class="tab-button" onclick="switchAdminTab('database')">Database</button>
+                </div>
+
+                <div id="reports" class="tab-content active">
+                    <div class="input-group">
+                        <label for="reportDate">Select Date:</label>
+                        <input type="date" id="reportDate" onchange="generateReport()">
+                    </div>
+                    <button class="warning" onclick="exportReport()">📥 Export Report</button>
+                    <table id="reportTable" style="margin-top: 20px;">
+                        <thead>
+                            <tr>
+                                <th>Person</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Late</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: #999;">Select a date to view reports</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="settings" class="tab-content">
+                    <div class="input-group">
+                        <label for="confidenceThreshold">Confidence Threshold (%):</label>
+                        <input type="number" id="confidenceThreshold" min="0" max="100" value="60">
+                    </div>
+                    <div class="input-group">
+                        <label for="lateThreshold">Late Time Threshold (minutes):</label>
+                        <input type="number" id="lateThreshold" min="0" value="15">
+                    </div>
+                    <button class="success" onclick="saveSettings()">💾 Save Settings</button>
+                </div>
+
+                <div id="database" class="tab-content">
+                    <button class="warning" onclick="downloadDatabase()">📥 Download Database</button>
+                    <button class="danger" onclick="clearDatabase()">🗑️ Clear All Data</button>
+                    <button class="success" onclick="document.getElementById('fileInput').click()">📤 Upload Database</button>
+                    <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="uploadDatabase(event)">
+                    <div style="margin-top: 20px; padding: 15px; background: var(--light); border-radius: var(--border-radius);">
+                        <p><strong>Database Size:</strong> <span id="dbSize">0 KB</span></p>
+                        <p><strong>Last Updated:</strong> <span id="lastUpdate">Never</span></p>
+                        <p><strong>Total Records:</strong> <span id="totalRecords">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeLoginModal()">&times;</span>
+            <div class="modal-header">Admin Login</div>
+            <div class="input-group">
+                <label for="adminPassword">Password:</label>
+                <input type="password" id="adminPassword" placeholder="Enter admin password">
+            </div>
+            <button class="success" style="width: 100%; margin-top: 20px;" onclick="adminLogin()">Login</button>
+        </div>
+    </div>
+
+    <!-- Add Person Modal -->
+    <div id="addPersonModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeAddPersonModal()">&times;</span>
+            <div class="modal-header">Add New Person</div>
+            <div class="input-group">
+                <label for="personName">Full Name:</label>
+                <input type="text" id="personName" placeholder="Enter full name">
+            </div>
+            <div class="input-group">
+                <label for="personEmail">Email:</label>
+                <input type="email" id="personEmail" placeholder="Enter email">
+            </div>
+            <div class="input-group">
+                <label for="personId">ID Number:</label>
+                <input type="text" id="personId" placeholder="Enter ID number">
+            </div>
+            <div class="input-group">
+                <label for="faceCapture">Capture Face:</label>
+                <button class="warning" onclick="captureFaceForNewPerson()" style="width: 100%;">📸 Capture Face</button>
+            </div>
+            <div id="facePreview" style="margin: 15px 0; text-align: center; display:none;">
+                <canvas id="faceCanvas" style="max-width: 100%; border-radius: var(--border-radius);"></canvas>
+            </div>
+            <button class="success" style="width: 100%; margin-top: 20px;" onclick="savePerson()">Save Person</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Global Variables ====================
+        let video, canvas, ctx;
+        let isLoggingIn = false;
+        let currentUser = null;
+        let detectedFace = null;
+        let faceDescriptor = null;
+        let allFaces = {};
+
+        const ADMIN_PASSWORD = 'admin123'; // Change this in production
+        const DB_KEY = 'faceRecognitionDB';
+        const SETTINGS_KEY = 'appSettings';
+
+        // Default Settings
+        const defaultSettings = {
+            confidenceThreshold: 60,
+            lateThreshold: 15,
+            workStartTime: '09:00',
+            workEndTime: '17:00'
+        };
+
+        // ==================== Initialize ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            
+            loadAllData();
+            updateAttendanceStats();
+            loadPeople();
+            
+            // Set current date to report
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('reportDate').value = today;
+            
+            // Load models
+            loadFaceApiModels();
+        });
+
+        // ==================== Face-API Functions ====================
+        async function loadFaceApiModels() {
+            try {
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/face-api@1.0.0/dist/models';
+                
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+                ]);
+                
+                console.log('Face API models loaded successfully');
+            } catch (error) {
+                console.error('Error loading models:', error);
+                showAlert('Error loading facial recognition models', 'error');
+            }
+        }
+
+        async function detectFace() {
+            if (!video.srcObject) return;
+
+            try {
+                const detections = await faceapi
+                    .detectAllFaces(video, new faceapi.TinyFaceDetector())
+                    .withFaceLandmarks()
+                    .withFaceDescriptors()
+                    .withFaceExpressions();
+
+                // Draw on canvas
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                const displaySize = {
+                    width: canvas.width,
+                    height: canvas.height
+                };
+
+                faceapi.matchDimensions(canvas, displaySize);
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw detections
+                resizedDetections.forEach(detection => {
+                    const box = detection.detection.box;
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+                    // Draw confidence
+                    const confidence = (detection.detection.score * 100).toFixed(2);
+                    ctx.fillStyle = '#10b981';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText(`${confidence}%`, box.x, box.y - 10);
+
+                    // Update confidence display
+                    document.getElementById('confidenceValue').textContent = confidence + '%';
+                    document.getElementById('accuracyFill').style.width = confidence + '%';
+
+                    // Store face info
+                    if (detection.descriptors) {
+                        faceDescriptor = detection.descriptors[0];
+                        detectedFace = detection;
+                    }
+                });
+
+                // Update face info
+                if (resizedDetections.length > 0) {
+                    document.getElementById('statusText').textContent = 'Face Detected';
+                    document.getElementById('faceInfo').innerHTML = `
+                        <strong>Faces Detected:</strong> ${resizedDetections.length}<br>
+                        <strong>Confidence:</strong> ${(resizedDetections[0].detection.score * 100).toFixed(2)}%
+                    `;
+                    document.getElementById('markAttendanceBtn').disabled = false;
+                } else {
+                    document.getElementById('statusText').textContent = 'Scanning...';
+                    document.getElementById('faceInfo').innerHTML = 'No face detected. Please position your face in front of the camera.';
+                    document.getElementById('markAttendanceBtn').disabled = true;
+                }
+
+                if (isLoggingIn) {
+                    requestAnimationFrame(detectFace);
+                }
+            } catch (error) {
+                console.error('Error detecting face:', error);
+            }
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' }
+                });
+                
+                video.srcObject = stream;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                
+                isLoggingIn = true;
+                requestAnimationFrame(detectFace);
+                
+                showAlert('Camera started successfully', 'success');
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                showAlert('Error accessing camera. Please allow camera permissions.', 'error');
+            }
+        }
+
+        function stopCamera() {
+            const tracks = video.srcObject.getTracks();
+            tracks.forEach(track => track.stop());
+            video.srcObject = null;
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('statusText').textContent = 'Camera Stopped';
+            document.getElementById('faceInfo').innerHTML = '';
+            document.getElementById('markAttendanceBtn').disabled = true;
+            
+            isLoggingIn = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // ==================== Attendance Functions ====================
+        function markAttendance() {
+            const selectedPerson = document.getElementById('attendeeSelect').value;
+            
+            if (!selectedPerson) {
+                showAlert('Please select a person from the dropdown', 'error');
+                return;
+            }
+
+            if (!faceDescriptor) {
+                showAlert('Please capture a face first', 'error');
+                return;
+            }
+
+            const db = loadDatabase();
+            const person = db.people.find(p => p.id === selectedPerson);
+
+            if (!person) {
+                showAlert('Selected person not found', 'error');
+                return;
+            }
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            const dateString = now.toLocaleDateString();
+
+            const attendance = {
+                id: Date.now(),
+                personId: person.id,
+                personName: person.name,
+                date: dateString,
+                time: timeString,
+                confidence: (detectedFace.detection.score * 100).toFixed(2),
+                status: getAttendanceStatus(now, person)
+            };
+
+            db.attendance.push(attendance);
+            saveDatabase(db);
+            
+            updateAttendanceStats();
+            loadAttendanceTable();
+
+            // Show result
+            showRecognitionResult(person.name, attendance.confidence, timeString);
+            showAlert(`✓ Attendance marked for ${person.name}`, 'success');
+        }
+
+        function getAttendanceStatus(date, person) {
+            const settings = loadSettings();
+            const hours = date.getHours();
+            const minutes = date.getMinutes();
+            const currentTime = hours * 60 + minutes;
+            
+            const [startHour, startMin] = settings.workStartTime.split(':').map(Number);
+            const startTime = startHour * 60 + startMin;
+            const lateTime = startTime + settings.lateThreshold;
+
+            if (currentTime <= startTime) return 'on-time';
+            if (currentTime <= lateTime) return 'late';
+            return 'absent';
+        }
+
+        function showRecognitionResult(name, confidence, time) {
+            const result = document.getElementById('recognitionResult');
+            document.getElementById('detectedName').textContent = name;
+            document.getElementById('detectedConfidence').textContent = confidence + '%';
+            document.getElementById('detectedTime').textContent = time;
+            result.style.display = 'block';
+            
+            setTimeout(() => {
+                result.style.display = 'none';
+            }, 5000);
+        }
+
+        // ==================== Data Management ====================
+        function loadDatabase() {
+            const db = localStorage.getItem(DB_KEY);
+            if (!db) {
+                return {
+                    people: [],
+                    attendance: [],
+                    lastUpdated: new Date().toISOString()
+                };
+            }
+            return JSON.parse(db);
+        }
+
+        function saveDatabase(db) {
+            db.lastUpdated = new Date().toISOString();
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+            updateDatabaseStats();
+        }
+
+        function loadSettings() {
+            const settings = localStorage.getItem(SETTINGS_KEY);
+            if (!settings) {
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(defaultSettings));
+                return defaultSettings;
+            }
+            return JSON.parse(settings);
+        }
+
+        function saveSettings() {
+            const settings = {
+                confidenceThreshold: parseInt(document.getElementById('confidenceThreshold').value),
+                lateThreshold: parseInt(document.getElementById('lateThreshold').value),
+                workStartTime: defaultSettings.workStartTime,
+                workEndTime: defaultSettings.workEndTime
+            };
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            showAlert('Settings saved successfully', 'success');
+        }
+
+        // ==================== People Management ====================
+        function loadPeople() {
+            const db = loadDatabase();
+            const select = document.getElementById('attendeeSelect');
+            
+            // Clear existing options except the first one
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+
+            // Add people to dropdown and table
+            db.people.forEach(person => {
+                const option = document.createElement('option');
+                option.value = person.id;
+                option.textContent = person.name;
+                select.appendChild(option);
+            });
+
+            updatePeopleTable(db.people);
+        }
+
+        function updatePeopleTable(people) {
+            const tbody = document.getElementById('peopleBody');
+            
+            if (people.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999;">No people registered</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = people.map(person => `
+                <tr>
+                    <td>${person.name}</td>
+                    <td>${person.email || '-'}</td>
+                    <td>${person.id}</td>
+                    <td>
+                        <button class="danger" onclick="deletePerson('${person.id}')" style="padding: 6px 12px; font-size: 12px;">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function openAddPersonModal() {
+            if (!currentUser) {
+                showAlert('Please login as admin first', 'error');
+                return;
+            }
+            document.getElementById('addPersonModal').classList.add('show');
+        }
+
+        function closeAddPersonModal() {
+            document.getElementById('addPersonModal').classList.remove('show');
+            document.getElementById('personName').value = '';
+            document.getElementById('personEmail').value = '';
+            document.getElementById('personId').value = '';
+            document.getElementById('facePreview').style.display = 'none';
+        }
+
+        function savePerson() {
+            const name = document.getElementById('personName').value.trim();
+            const email = document.getElementById('personEmail').value.trim();
+            const id = document.getElementById('personId').value.trim();
+
+            if (!name || !id) {
+                showAlert('Please fill in name and ID', 'error');
+                return;
+            }
+
+            const db = loadDatabase();
+            
+            if (db.people.some(p => p.id === id)) {
+                showAlert('ID already exists', 'error');
+                return;
+            }
+
+            const person = {
+                id: id,
+                name: name,
+                email: email,
+                faceDescriptor: faceDescriptor ? Array.from(faceDescriptor) : null,
+                dateAdded: new Date().toISOString()
+            };
+
+            db.people.push(person);
+            saveDatabase(db);
+            
+            loadPeople();
+            closeAddPersonModal();
+            showAlert(`Person "${name}" added successfully`, 'success');
+        }
+
+        function deletePerson(personId) {
+            if (!confirm('Are you sure you want to delete this person?')) return;
+
+            const db = loadDatabase();
+            db.people = db.people.filter(p => p.id !== personId);
+            saveDatabase(db);
+            
+            loadPeople();
+            showAlert('Person deleted successfully', 'success');
+        }
+
+        function captureFaceForNewPerson() {
+            if (!video.srcObject) {
+                showAlert('Please start the camera first', 'error');
+                return;
+            }
+
+            if (!detectedFace) {
+                showAlert('No face detected. Please position your face in front of the camera.', 'error');
+                return;
+            }
+
+            // Capture face from canvas
+            const faceCanvas = document.getElementById('faceCanvas');
+            const faceCtx = faceCanvas.getContext('2d');
+            
+            const box = detectedFace.detection.box;
+            faceCanvas.width = box.width + 20;
+            faceCanvas.height = box.height + 20;
+            
+            faceCtx.drawImage(
+                canvas,
+                box.x - 10, box.y - 10,
+                box.width + 20, box.height + 20,
+                0, 0,
+                faceCanvas.width, faceCanvas.height
+            );
+
+            document.getElementById('facePreview').style.display = 'block';
+            showAlert('Face captured successfully', 'success');
+        }
+
+        // ==================== Attendance Table ====================
+        function loadAttendanceTable() {
+            const db = loadDatabase();
+            const today = new Date().toLocaleDateString();
+            const todayRecords = db.attendance.filter(a => a.date === today);
+
+            const tbody = document.getElementById('attendanceBody');
+            
+            if (todayRecords.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999;">No records yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = todayRecords.map(record => {
+                const statusClass = record.status === 'present' ? 'present' : 
+                                   record.status === 'late' ? 'late' : 'absent';
+                return `
+                    <tr>
+                        <td>${record.personName}</td>
+                        <td>${record.time}</td>
+                        <td><span class="status-badge ${statusClass}">${record.status.toUpperCase()}</span></td>
+                        <td>
+                            <button class="danger" onclick="deleteAttendance(${record.id})" style="padding: 6px 12px; font-size: 12px;">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateAttendanceStats() {
+            const db = loadDatabase();
+            const today = new Date().toLocaleDateString();
+            const todayRecords = db.attendance.filter(a => a.date === today);
+
+            const total = db.people.length;
+            const present = todayRecords.length;
+            const absent = total - present;
+            const late = todayRecords.filter(a => a.status === 'late').length;
+
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('presentCount').textContent = present;
+            document.getElementById('absentCount').textContent = absent;
+            document.getElementById('lateCount').textContent = late;
+
+            loadAttendanceTable();
+        }
+
+        function deleteAttendance(recordId) {
+            if (!confirm('Are you sure you want to delete this record?')) return;
+
+            const db = loadDatabase();
+            db.attendance = db.attendance.filter(a => a.id !== recordId);
+            saveDatabase(db);
+            
+            updateAttendanceStats();
+            showAlert('Record deleted successfully', 'success');
+        }
+
+        // ==================== History ====================
+        function loadAttendanceHistory() {
+            const db = loadDatabase();
+            const tbody = document.getElementById('historyBody');
+
+            if (db.attendance.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999;">No history available</td></tr>';
+                return;
+            }
+
+            const grouped = {};
+            db.attendance.forEach(record => {
+                if (!grouped[record.date]) grouped[record.date] = [];
+                grouped[record.date].push(record);
+            });
+
+            let html = '';
+            Object.keys(grouped).reverse().forEach(date => {
+                grouped[date].forEach(record => {
+                    html += `
+                        <tr>
+                            <td>${record.date}</td>
+                            <td>${record.personName}</td>
+                            <td>${record.time}</td>
+                            <td><span class="status-badge ${record.status}">${record.status.toUpperCase()}</span></td>
+                        </tr>
+                    `;
+                });
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        // ==================== Admin Functions ====================
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.add('show');
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.remove('show');
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function adminLogin() {
+            const password = document.getElementById('adminPassword').value;
+
+            if (password === ADMIN_PASSWORD) {
+                currentUser = 'admin';
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('logoutBtn').style.display = 'inline-block';
+                document.getElementById('adminBtn').disabled = false;
+                closeLoginModal();
+                showAlert('Admin logged in successfully', 'success');
+            } else {
+                showAlert('Incorrect password', 'error');
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('loginBtn').style.display = 'inline-block';
+            document.getElementById('logoutBtn').style.display = 'none';
+            document.getElementById('adminBtn').disabled = true;
+            document.getElementById('mainView').style.display = '';
+            document.getElementById('adminView').style.display = 'none';
+            showAlert('Logged out successfully', 'success');
+        }
+
+        document.getElementById('loginBtn').addEventListener('click', openLoginModal);
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+
+        document.getElementById('adminBtn').addEventListener('click', function() {
+            if (!currentUser) {
+                openLoginModal();
+            } else {
+                document.getElementById('mainView').style.display = 'none';
+                document.getElementById('adminView').style.display = 'block';
+                loadAttendanceHistory();
+                loadAdminSettings();
+                updateDatabaseStats();
+            }
+        });
+
+        function loadAdminSettings() {
+            const settings = loadSettings();
+            document.getElementById('confidenceThreshold').value = settings.confidenceThreshold;
+            document.getElementById('lateThreshold').value = settings.lateThreshold;
+        }
+
+        function generateReport() {
+            const selectedDate = document.getElementById('reportDate').value;
+            const db = loadDatabase();
+
+            const records = db.attendance.filter(a => a.date === selectedDate);
+            const summary = {};
+
+            db.people.forEach(person => {
+                const personRecords = records.filter(r => r.personId === person.id);
+                summary[person.name] = {
+                    present: personRecords.filter(r => r.status === 'on-time' || r.status === 'present').length,
+                    late: personRecords.filter(r => r.status === 'late').length,
+                    absent: 0
+                };
+            });
+
+            const tbody = document.getElementById('reportBody');
+            let html = '';
+
+            Object.entries(summary).forEach(([name, data]) => {
+                const total = data.present + data.late;
+                const percentage = total > 0 ? ((data.present / total) * 100).toFixed(2) : 0;
+
+                html += `
+                    <tr>
+                        <td>${name}</td>
+                        <td>${data.present}</td>
+                        <td>${data.absent}</td>
+                        <td>${data.late}</td>
+                        <td>${percentage}%</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html || '<tr><td colspan="5" style="text-align: center; color: #999;">No records for this date</td></tr>';
+        }
+
+        function exportReport() {
+            const selectedDate = document.getElementById('reportDate').value;
+            const db = loadDatabase();
+            const records = db.attendance.filter(a => a.date === selectedDate);
+
+            let csv = 'Date,Person,Time,Confidence,Status\n';
+            records.forEach(record => {
+                csv += `${record.date},${record.personName},${record.time},${record.confidence},${record.status}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `attendance_${selectedDate}.csv`;
+            a.click();
+
+            showAlert('Report exported successfully', 'success');
+        }
+
+        function downloadDatabase() {
+            const db = loadDatabase();
+            const json = JSON.stringify(db, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `database_${new Date().toISOString()}.json`;
+            a.click();
+
+            showAlert('Database downloaded successfully', 'success');
+        }
+
+        function uploadDatabase(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const db = JSON.parse(e.target.result);
+                    if (!db.people || !db.attendance) {
+                        throw new Error('Invalid database format');
+                    }
+                    localStorage.setItem(DB_KEY, JSON.stringify(db));
+                    showAlert('Database uploaded successfully', 'success');
+                    loadPeople();
+                    updateAttendanceStats();
+                } catch (error) {
+                    showAlert('Error uploading database: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearDatabase() {
+            if (!confirm('Are you sure you want to delete all data? This cannot be undone!')) return;
+
+            localStorage.removeItem(DB_KEY);
+            localStorage.removeItem(SETTINGS_KEY);
+            loadPeople();
+            updateAttendanceStats();
+            showAlert('All data cleared successfully', 'success');
+        }
+
+        function updateDatabaseStats() {
+            const db = loadDatabase();
+            const dbSize = (JSON.stringify(db).length / 1024).toFixed(2);
+            const lastUpdate = new Date(db.lastUpdated).toLocaleString();
+
+            document.getElementById('dbSize').textContent = dbSize + ' KB';
+            document.getElementById('lastUpdate').textContent = lastUpdate;
+            document.getElementById('totalRecords').textContent = db.attendance.length;
+        }
+
+        // ==================== Tab Navigation ====================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            if (tabName === 'history') {
+                loadAttendanceHistory();
+            }
+        }
+
+        function switchAdminTab(tabName) {
+            document.querySelectorAll('#adminView .tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+
+            document.querySelectorAll('#adminView .tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // ==================== Utility Functions ====================
+        function loadAllData() {
+            loadPeople();
+            updateAttendanceStats();
+            loadAttendanceHistory();
+        }
+
+        function showAlert(message, type) {
+            const alertId = {
+                'success': 'successAlert',
+                'error': 'errorAlert',
+                'info': 'infoAlert'
+            }[type];
+
+            const alertElement = document.getElementById(alertId);
+            alertElement.textContent = message;
+            alertElement.classList.add('show');
+
+            setTimeout(() => {
+                alertElement.classList.remove('show');
+            }, 5000);
+        }
+
+        // Prevent default behaviors
+        window.addEventListener('beforeunload', function(e) {
+            if (isLoggingIn) {
+                stopCamera();
+            }
+        });
+    </script>
+</body>
+</html>
